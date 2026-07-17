@@ -28,6 +28,7 @@ max_steps = int(os.getenv("ECMC_MAX_STEPS", "-1"))
 max_epochs = int(os.getenv("ECMC_MAX_EPOCHS", "100"))
 checkpoint_every_n_steps = int(os.getenv("ECMC_CHECKPOINT_EVERY_N_STEPS", "100"))
 save_last = os.getenv("ECMC_SAVE_LAST", "1") == "1"
+checkpoint_dir = os.getenv("ECMC_CHECKPOINT_DIR", "./checkpoints")
 print(f"Resource-safe mode: {not train_qformers}; trainable parameters: "
       f"{sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
 #create the train and val set
@@ -69,7 +70,7 @@ val_loader=DataLoader(val_set, shuffle=False, **loader_kwargs)
 
 #put your own checkpoint dir here
 checkpoint_callback = ModelCheckpoint(
-        dirpath='./checkpoints',
+        dirpath=checkpoint_dir,
         filename='stage1-{epoch:02d}-{step:05d}',
         save_top_k=-1,
         every_n_train_steps=checkpoint_every_n_steps,
