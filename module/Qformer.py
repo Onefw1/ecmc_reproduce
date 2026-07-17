@@ -692,6 +692,9 @@ class BertPreTrainedModel(PreTrainedModel):
     config_class = BertConfig
     base_model_prefix = "bert"
     _keys_to_ignore_on_load_missing = [r"position_ids"]
+    # Newer Transformers inspects this attribute while tying model weights.
+    # ECMC removes the Q-Former language-model head after initialization.
+    all_tied_weights_keys = {}
 
     def _init_weights(self, module):
         """Initialize the weights"""
