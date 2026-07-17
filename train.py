@@ -15,19 +15,25 @@ from MMDAdataloader import *
 from MMDAmodel import ECMC
 
 pl.seed_everything(666)
-model=ECMC()
+data_root = "my_text/egocom_ecmc_formal/MMDA"
+label_root = "my_text/egocom_ecmc_labeled"
+
+# EgoCom cognition positives are too sparse for stable contrastive supervision.
+model=ECMC(cognition_loss_weight=0.0)
     
 batch_size=64
 #create the train and val set
 train_set = MMDADataset(
-        split_file="train.csv",
+        root_dir=data_root,
+        split_file=os.path.join(label_root, "train_full_v2_conservative.csv"),
         modalities=("text", "audio", "video"),
-        max_seq_len={"audio": 1024, "video": 512},
+        max_seq_len={"audio": 32, "video": 32},
     )
 val_set = MMDADataset(
-        split_file="val.csv",
+        root_dir=data_root,
+        split_file=os.path.join(label_root, "val_full_v2_conservative.csv"),
         modalities=("text", "audio", "video"),
-        max_seq_len={"audio": 1024, "video": 512},
+        max_seq_len={"audio": 32, "video": 32},
     )
 
 train_loader=DataLoader(train_set, batch_size=batch_size, shuffle=True, collate_fn=collate_multimodal_batch,prefetch_factor=2,persistent_workers=True,num_workers=8)

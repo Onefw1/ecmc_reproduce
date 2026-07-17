@@ -30,7 +30,11 @@ class KeywordsStoppingCriteria(StoppingCriteria):
 class ECMC(pl.LightningModule):
     def __init__(
         self,
-        text2vec_ckpt="weights"):
+        text2vec_ckpt="weights",
+        audio_input_dim=512,
+        video_input_dim=2048,
+        hidden_size=768,
+        cognition_loss_weight=1.0):
         super(ECMC,self).__init__()
         self.training_step_outputs  = []
         
@@ -44,6 +48,11 @@ class ECMC(pl.LightningModule):
 
         for p in self.parameters():
             p.requires_grad = False
+
+        # EgoCom feature widths differ from the 768-D Q-Former input.
+        self.audio_adapter = nn.Linear(audio_input_dim, hidden_size)
+        self.video_adapter = nn.Linear(video_input_dim, hidden_size)
+        self.cognition_loss_weight = cognition_loss_weight
 
         #Qformer-audio-emo
         self.audio_Qformer,self.audio_query_tokens=self.init_Qformer(num_query_token=32,vision_width=768)
@@ -129,7 +138,7 @@ class ECMC(pl.LightningModule):
     
     def forward(self, audio, video, text, emo_category, cognition_category):
         #audio  直接用 DataLoader 读进来的 .npy 数据，shape: (B, 1024, 768)
-        audio_feature=audio
+        audio_feature=self.audio_adapter(audio.float())
 
         #text2vec 编码文字
         with torch.no_grad():  # 冻结，不训练bert
@@ -155,7 +164,7 @@ class ECMC(pl.LightningModule):
         audio_hidden=audio_query_output.last_hidden_state#[B,32,768]
 
         # 直接用 DataLoader 读进来的 .npy 数据，shape: (B, 512, 768)
-        video_feature=video
+        video_feature=self.video_adapter(video.float())
         # video → 情感视频 Q-Former
         video_query_tokens=self.video_query_tokens.expand(video_feature.shape[0], -1, -1)
         frame_atts_video = torch.ones(video_feature.size()[:-1], dtype=torch.long).to(video_feature.device)
@@ -219,13 +228,13 @@ class ECMC(pl.LightningModule):
         temperature=0.1
         )
     
-        cog_loss = self.multilabel_contrastive_loss(
+        cog_loss = combined_feature_cong.new_zeros(()) if self.cognition_loss_weight == 0 else self.multilabel_contrastive_loss(
         features=combined_feature_cong,
         labels=[row.nonzero(as_tuple=True)[0].tolist() for row in cognition_category],  # 转类别索引
         temperature=0.1
         )
 
-        return emo_loss + cog_loss, combined_feature_emo, combined_feature_cong
+        return emo_loss + self.cognition_loss_weight * cog_loss, combined_feature_emo, combined_feature_cong
     
     def contrastive_loss(self, features, labels, temperature=0.1):
         """

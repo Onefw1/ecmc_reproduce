@@ -34,7 +34,7 @@ class MMDADataset(Dataset):
         self.modalities = modalities
         self.max_seq_len = max_seq_len
 
-        # Read CSV file and parse multi-labels
+        # Read CSV file and parse labels.
         self.df = pd.read_csv(split_file)
 
         def safe_parse_int(x):
@@ -44,11 +44,30 @@ class MMDADataset(Dataset):
                 return 0
         self.df["emotion_bin"] = self.df["emotion_bin"].fillna(0).apply(safe_parse_int)
 
-        self.df["cognition_bin"] = self.df["cognition_bin"].apply(ast.literal_eval)  
-        
-        # Build category indices
-        self._build_indices()
+        self.df["cognition_bin"] = self.df["cognition_bin"].apply(self._parse_cognition_bin)
+
         self._validate_data()
+        self._build_indices()
+
+    @staticmethod
+    def _parse_cognition_bin(value):
+        """Parse and validate a four-dimensional cognition label."""
+        try:
+            label = ast.literal_eval(value) if isinstance(value, str) else value
+        except (ValueError, SyntaxError):
+            return [0, 0, 0, 0]
+
+        if not isinstance(label, (list, tuple)) or len(label) != 4:
+            return [0, 0, 0, 0]
+        return [int(item) for item in label]
+
+    @staticmethod
+    def _feature_stem(row) -> str:
+        """Use EgoCom's exported id, with legacy ECMC CSV support."""
+        sample_id = row.get("id")
+        if pd.notna(sample_id) and str(sample_id).strip():
+            return str(sample_id)
+        return f"{row['id']}_{row['hdTimeStart']}_{row['hdTimeEnd']}"
 
     def _build_indices(self):
         """Build sample indices for emotion and cognition categories"""
@@ -72,7 +91,7 @@ class MMDADataset(Dataset):
         """Validate and filter samples with missing feature files"""
         valid_indices = []
         for idx, row in self.df.iterrows():
-            base_name = f"{row['id']}_{row['hdTimeStart']}_{row['hdTimeEnd']}"
+            base_name = self._feature_stem(row)
             valid = True
             
             if "audio" in self.modalities:
@@ -98,7 +117,7 @@ class MMDADataset(Dataset):
 
     def __getitem__(self, idx: int) -> Dict[str, Union[str, np.ndarray, List[int]]]:
         row = self.df.iloc[idx]
-        base_name = f"{row['id']}_{row['hdTimeStart']}_{row['hdTimeEnd']}"
+        base_name = self._feature_stem(row)
         
         # Base data
         data = {
@@ -114,7 +133,7 @@ class MMDADataset(Dataset):
         if "audio" in self.modalities:
             audio_path = os.path.join(self.audio_dir, f"{base_name}.npy")
             if os.path.exists(audio_path):
-                audio_feat = np.load(audio_path)
+                audio_feat = np.load(audio_path).astype(np.float32, copy=False)
                 data["audio"] = self._pad_feature(audio_feat, self.max_seq_len["audio"])
             else:
                 pass
@@ -123,7 +142,7 @@ class MMDADataset(Dataset):
         if "video" in self.modalities:
             video_path = os.path.join(self.video_dir, f"{base_name}.npy")
             if os.path.exists(video_path):
-                video_feat = np.load(video_path)
+                video_feat = np.load(video_path).astype(np.float32, copy=False)
                 data["video"] = self._pad_feature(video_feat, self.max_seq_len["video"])
             else:
                 pass
