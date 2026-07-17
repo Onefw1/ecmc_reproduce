@@ -28,18 +28,52 @@ from transformers.modeling_outputs import (
 )
 from transformers.modeling_utils import PreTrainedModel
 
-try:
-    from transformers.modeling_utils import (
-        apply_chunking_to_forward,
-        find_pruneable_heads_and_indices,
-        prune_linear_layer,
-    )
-except ImportError:
-    from transformers.pytorch_utils import (
-        apply_chunking_to_forward,
-        find_pruneable_heads_and_indices,
-        prune_linear_layer,
-    )
+
+def apply_chunking_to_forward(forward_fn, chunk_size, chunk_dim, *input_tensors):
+    """Apply a forward function in chunks without relying on Transformers internals."""
+    if chunk_size <= 0:
+        return forward_fn(*input_tensors)
+
+    tensor_shape = input_tensors[0].shape[chunk_dim]
+    if any(tensor.shape[chunk_dim] != tensor_shape for tensor in input_tensors):
+        raise ValueError("All input tensors must have the same chunk dimension size.")
+    if tensor_shape % chunk_size != 0:
+        raise ValueError("The chunk dimension size must be divisible by chunk_size.")
+
+    chunks = zip(*(tensor.chunk(tensor_shape // chunk_size, dim=chunk_dim) for tensor in input_tensors))
+    return torch.cat(tuple(forward_fn(*chunk) for chunk in chunks), dim=chunk_dim)
+
+
+def find_pruneable_heads_and_indices(heads, n_heads, head_size, already_pruned_heads):
+    """Return the unpruned head indices used by the optional head-pruning API."""
+    heads = set(heads) - already_pruned_heads
+    mask = torch.ones(n_heads, head_size)
+    for head in heads:
+        head -= sum(1 if pruned_head < head else 0 for pruned_head in already_pruned_heads)
+        mask[head] = 0
+    index = torch.arange(mask.numel())[mask.view(-1).bool()].long()
+    return heads, index
+
+
+def prune_linear_layer(layer, index, dim=0):
+    """Prune a linear layer for the optional attention-head pruning API."""
+    index = index.to(layer.weight.device)
+    weight = layer.weight.index_select(dim, index).clone().detach()
+    bias = None
+    if layer.bias is not None:
+        bias = layer.bias.clone().detach() if dim == 1 else layer.bias.index_select(0, index).clone().detach()
+
+    new_size = list(layer.weight.size())
+    new_size[dim] = len(index)
+    new_layer = nn.Linear(new_size[1], new_size[0], bias=layer.bias is not None).to(layer.weight.device)
+    new_layer.weight.requires_grad = layer.weight.requires_grad
+    if new_layer.bias is not None:
+        new_layer.bias.requires_grad = layer.bias.requires_grad
+    with torch.no_grad():
+        new_layer.weight.copy_(weight.contiguous())
+        if bias is not None:
+            new_layer.bias.copy_(bias.contiguous())
+    return new_layer
 from transformers.utils import logging
 from transformers.models.bert.configuration_bert import BertConfig
 
