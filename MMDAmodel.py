@@ -320,7 +320,8 @@ class ECMC(pl.LightningModule):
         # 负样本：情绪标签不同的样本对
         negatives = (~label_matrix_masked).float()
         # 类间（不同情绪）损失：如果负样本相似度过高，exp(logits) 会变大，从而增大惩罚
-        inter_loss = torch.log1p(torch.exp(logits_masked) * negatives).mean()
+        # softplus(x) is log(1 + exp(x)) but remains finite under FP16 AMP.
+        inter_loss = (F.softplus(logits_masked) * negatives).mean()
 
         # 总情绪对比损失 = 同类拉近损失 + 异类推远损失
         return intra_loss + inter_loss
