@@ -696,6 +696,23 @@ class BertPreTrainedModel(PreTrainedModel):
     # ECMC removes the Q-Former language-model head after initialization.
     all_tied_weights_keys = {}
 
+    def get_head_mask(self, head_mask, num_hidden_layers, is_attention_chunked=False):
+        """Create the per-layer attention-head mask expected by the legacy encoder."""
+        if head_mask is None:
+            return [None] * num_hidden_layers
+
+        if head_mask.dim() == 1:
+            head_mask = head_mask.unsqueeze(0).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
+            head_mask = head_mask.expand(num_hidden_layers, -1, -1, -1, -1)
+        elif head_mask.dim() == 2:
+            head_mask = head_mask.unsqueeze(1).unsqueeze(-1).unsqueeze(-1)
+        elif head_mask.dim() != 5:
+            raise ValueError("head_mask must have 1, 2, or 5 dimensions.")
+
+        if is_attention_chunked:
+            head_mask = head_mask.unsqueeze(-1)
+        return head_mask.to(dtype=self.dtype)
+
     def _init_weights(self, module):
         """Initialize the weights"""
         if isinstance(module, (nn.Linear, nn.Embedding)):
