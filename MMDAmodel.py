@@ -34,7 +34,8 @@ class ECMC(pl.LightningModule):
         audio_input_dim=512,
         video_input_dim=2048,
         hidden_size=768,
-        cognition_loss_weight=1.0):
+        cognition_loss_weight=1.0,
+        train_qformers=True):
         super(ECMC,self).__init__()
         self.training_step_outputs  = []
         
@@ -53,6 +54,7 @@ class ECMC(pl.LightningModule):
         self.audio_adapter = nn.Linear(audio_input_dim, hidden_size)
         self.video_adapter = nn.Linear(video_input_dim, hidden_size)
         self.cognition_loss_weight = cognition_loss_weight
+        self.train_qformers = train_qformers
 
         #Qformer-audio-emo
         self.audio_Qformer,self.audio_query_tokens=self.init_Qformer(num_query_token=32,vision_width=768)
@@ -109,6 +111,28 @@ class ECMC(pl.LightningModule):
         for layer in self.text_Qformer_cong.bert.encoder.layer:
             layer.output = None
             layer.intermediate = None
+
+        if not self.train_qformers:
+            qformers = (
+                self.audio_Qformer,
+                self.video_Qformer,
+                self.text_Qformer,
+                self.audio_Qformer_cong,
+                self.video_Qformer_cong,
+                self.text_Qformer_cong,
+            )
+            for qformer in qformers:
+                qformer.requires_grad_(False)
+            for query_tokens in (
+                self.audio_query_tokens,
+                self.video_query_tokens,
+                self.text_query_tokens,
+                self.audio_query_tokens_cong,
+                self.video_query_tokens_cong,
+                self.text_query_tokens_cong,
+            ):
+                query_tokens.requires_grad_(False)
+            self.audio_llama_project.requires_grad_(False)
         
 
     def init_Qformer(self,num_query_token, vision_width, cross_attention_freq=2):

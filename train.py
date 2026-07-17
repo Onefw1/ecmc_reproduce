@@ -18,13 +18,17 @@ data_root = "my_text/egocom_ecmc_formal/MMDA"
 label_root = "my_text/egocom_ecmc_labeled"
 
 # EgoCom cognition positives are too sparse for stable contrastive supervision.
-model=ECMC(cognition_loss_weight=0.0)
+# Adapter-only is the default resource-safe mode for Colab validation.
+train_qformers = os.getenv("ECMC_TRAIN_QFORMERS", "0") == "1"
+model=ECMC(cognition_loss_weight=0.0, train_qformers=train_qformers)
 
 batch_size = int(os.getenv("ECMC_BATCH_SIZE", "4"))
-num_workers = int(os.getenv("ECMC_NUM_WORKERS", "2"))
+num_workers = int(os.getenv("ECMC_NUM_WORKERS", "0"))
 max_steps = int(os.getenv("ECMC_MAX_STEPS", "-1"))
 max_epochs = int(os.getenv("ECMC_MAX_EPOCHS", "100"))
 checkpoint_every_n_steps = int(os.getenv("ECMC_CHECKPOINT_EVERY_N_STEPS", "100"))
+print(f"Resource-safe mode: {not train_qformers}; trainable parameters: "
+      f"{sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
 #create the train and val set
 train_set = MMDADataset(
         root_dir=data_root,
