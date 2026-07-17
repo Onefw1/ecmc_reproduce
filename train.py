@@ -1,5 +1,4 @@
-from torch.utils.data import DataLoader
-from torch.utils.data import Dataset, DataLoader, RandomSampler
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from transformers import AutoTokenizer
 from torch.nn import CrossEntropyLoss
 import torch
@@ -20,8 +19,12 @@ label_root = "my_text/egocom_ecmc_labeled"
 
 # EgoCom cognition positives are too sparse for stable contrastive supervision.
 model=ECMC(cognition_loss_weight=0.0)
-    
-batch_size=64
+
+batch_size = int(os.getenv("ECMC_BATCH_SIZE", "4"))
+num_workers = int(os.getenv("ECMC_NUM_WORKERS", "2"))
+max_steps = int(os.getenv("ECMC_MAX_STEPS", "-1"))
+max_epochs = int(os.getenv("ECMC_MAX_EPOCHS", "100"))
+checkpoint_every_n_steps = int(os.getenv("ECMC_CHECKPOINT_EVERY_N_STEPS", "100"))
 #create the train and val set
 train_set = MMDADataset(
         root_dir=data_root,
@@ -36,24 +39,44 @@ val_set = MMDADataset(
         max_seq_len={"audio": 32, "video": 32},
     )
 
-train_loader=DataLoader(train_set, batch_size=batch_size, shuffle=True, collate_fn=collate_multimodal_batch,prefetch_factor=2,persistent_workers=True,num_workers=8)
-val_loader=DataLoader(val_set, batch_size=batch_size, shuffle=False, collate_fn=collate_multimodal_batch,prefetch_factor=2,persistent_workers=True,num_workers=8)
+loader_kwargs = {
+    "batch_size": batch_size,
+    "collate_fn": collate_multimodal_batch,
+    "num_workers": num_workers,
+}
+if num_workers > 0:
+    loader_kwargs.update(prefetch_factor=2, persistent_workers=True)
+
+# EgoCom is dominated by neutral turns. Balance emotion sampling so Stage 1
+# contrastive batches contain useful positive and negative pairs more often.
+emotion_counts = train_set.df["emotion_bin"].value_counts().to_dict()
+sample_weights = train_set.df["emotion_bin"].map(
+    lambda label: 1.0 / emotion_counts[label]
+).to_numpy()
+train_sampler = WeightedRandomSampler(
+    weights=torch.as_tensor(sample_weights, dtype=torch.double),
+    num_samples=len(train_set),
+    replacement=True,
+)
+
+train_loader=DataLoader(train_set, sampler=train_sampler, shuffle=False, **loader_kwargs)
+val_loader=DataLoader(val_set, shuffle=False, **loader_kwargs)
 
 #put your own checkpoint dir here
 checkpoint_callback = ModelCheckpoint(
         dirpath='./checkpoints',
-        filename='mymodel-{epoch:02d}-{train_loss:.5f}',
-        save_top_k=20,
-        every_n_epochs=5,
-        monitor='val_loss',
-        mode='min'
+        filename='stage1-{epoch:02d}-{step:05d}',
+        save_top_k=-1,
+        every_n_train_steps=checkpoint_every_n_steps,
+        save_last=True,
     )
 
 trainer = pl.Trainer(
     profiler="simple",
     logger=TensorBoardLogger(name='MMDA_model',save_dir='./logger'),
     accelerator='gpu',
-    max_epochs=10000,
+    max_epochs=max_epochs,
+    max_steps=max_steps,
     devices=1,
     log_every_n_steps=50,
     precision="16-mixed",
