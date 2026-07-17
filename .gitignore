@@ -1,0 +1,54 @@
+# Python and Jupyter cache
+__pycache__/
+*.py[cod]
+*.pyo
+.ipynb_checkpoints/
+.pytest_cache/
+.mypy_cache/
+
+# Local environments and secrets
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+*.key
+*secret*
+*token*
+
+# The current annotation notebook embeds an API key.
+# Replace it with environment-based configuration before tracking a future version.
+my_text/EgoCom_experiment/egocom_ecmc_weak_annotation.ipynb
+
+# Large EgoCom-derived data and raw annotation records
+my_text/egocom_ecmc_formal/
+my_text/egocom_ecmc_labeled/
+my_text/egocom_ecmc_debug/
+
+# Downloaded archives and extracted feature arrays
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.npy
+*.npz
+
+# Training artifacts
+checkpoints/
+outputs/
+runs/
+logs/
+wandb/
+tensorboard/
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.safetensors
+
+# Operating-system and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
