@@ -277,9 +277,11 @@ class ECMC(pl.LightningModule):
         情绪对比学习里去掉对角线，是为了避免样本和自己比较这种没有训练意义的正样本参与 loss。认知多标签 loss 当前代码没有去掉对角线，因此样本自己会被当成正样本，这可以保证每个样本至少有正样本，计算上更稳定；但从严格对比学习角度看，这会引入 trivial positive，可能削弱模型学习“不同样本之间认知相似性”的信号。因此认知 loss 不是理论上不需要去掉，而是当前实现没有去掉。
         """
         # 将每个样本的 96 个 token 平均成一个整体情绪向量：(B, 96, 768) -> (B, 768)
-        features = features.mean(dim=1)
+        # Keep similarity and log-probability calculations in FP32 even when
+        # Lightning runs the encoders under mixed precision.
+        features = features.mean(dim=1).float()
         # L2 归一化，只比较向量方向，避免向量长度影响相似度
-        features = F.normalize(features, p=2, dim=1)
+        features = F.normalize(features, p=2, dim=1, eps=1e-6)
         # 计算 batch 内样本两两相似度矩阵：(B, 768) @ (768, B) -> (B, B)，logits[i][j] 表示：第 i 个样本 和 第 j 个样本 的相似度
         logits = torch.matmul(features, features.T) / temperature
         labels = labels.view(-1)  # 将 labels 从 (32, 1) 变为 (32,)
