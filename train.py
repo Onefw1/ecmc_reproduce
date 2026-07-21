@@ -20,7 +20,12 @@ label_root = "my_text/egocom_ecmc_labeled"
 # EgoCom cognition positives are too sparse for stable contrastive supervision.
 # Adapter-only is the default resource-safe mode for Colab validation.
 train_qformers = os.getenv("ECMC_TRAIN_QFORMERS", "0") == "1"
-model=ECMC(cognition_loss_weight=0.0, train_qformers=train_qformers)
+learning_rate = float(os.getenv("ECMC_LEARNING_RATE", "1e-6"))
+model=ECMC(
+    cognition_loss_weight=0.0,
+    train_qformers=train_qformers,
+    learning_rate=learning_rate,
+)
 
 batch_size = int(os.getenv("ECMC_BATCH_SIZE", "4"))
 num_workers = int(os.getenv("ECMC_NUM_WORKERS", "0"))
@@ -30,9 +35,10 @@ checkpoint_every_n_steps = int(os.getenv("ECMC_CHECKPOINT_EVERY_N_STEPS", "100")
 save_last = os.getenv("ECMC_SAVE_LAST", "1") == "1"
 checkpoint_dir = os.getenv("ECMC_CHECKPOINT_DIR", "./checkpoints")
 precision = os.getenv("ECMC_PRECISION", "32-true")
+gradient_clip_val = float(os.getenv("ECMC_GRADIENT_CLIP_VAL", "1.0"))
 print(f"Resource-safe mode: {not train_qformers}; trainable parameters: "
       f"{sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
-print(f"Trainer precision: {precision}")
+print(f"Trainer precision: {precision}; learning rate: {learning_rate}; gradient clip: {gradient_clip_val}")
 #create the train and val set
 train_set = MMDADataset(
         root_dir=data_root,
@@ -88,6 +94,8 @@ trainer = pl.Trainer(
     devices=1,
     log_every_n_steps=50,
     precision=precision,
+    gradient_clip_val=gradient_clip_val,
+    gradient_clip_algorithm="norm",
     callbacks=[checkpoint_callback],
     #accumulate_grad_batches=4,
     #strategy="ddp_find_unused_parameters_true"

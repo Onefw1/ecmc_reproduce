@@ -35,7 +35,8 @@ class ECMC(pl.LightningModule):
         video_input_dim=2048,
         hidden_size=768,
         cognition_loss_weight=1.0,
-        train_qformers=True):
+        train_qformers=True,
+        learning_rate=1.3e-5):
         super(ECMC,self).__init__()
         self.training_step_outputs  = []
         
@@ -55,6 +56,7 @@ class ECMC(pl.LightningModule):
         self.video_adapter = nn.Linear(video_input_dim, hidden_size)
         self.cognition_loss_weight = cognition_loss_weight
         self.train_qformers = train_qformers
+        self.learning_rate = learning_rate
 
         #Qformer-audio-emo
         self.audio_Qformer,self.audio_query_tokens=self.init_Qformer(num_query_token=32,vision_width=768)
@@ -321,6 +323,7 @@ class ECMC(pl.LightningModule):
 
         # 负样本：情绪标签不同的样本对
         negatives = (~label_matrix_masked).float()
+        #inter_loss = torch.log1p(torch.exp(logits_masked) * negatives).mean() 论文给的计算方法
         # 类间（不同情绪）损失：如果负样本相似度过高，exp(logits) 会变大，从而增大惩罚
         # softplus(x) is log(1 + exp(x)) but remains finite under FP16 AMP.
         inter_loss = (F.softplus(logits_masked) * negatives).mean()
@@ -393,6 +396,7 @@ class ECMC(pl.LightningModule):
         )
         # 负样本项：如果负样本相似度过高，会增加该惩罚项
         # .sum(dim=1) 对每个样本，把它和所有负样本的相似度惩罚加起来。
+        #torch.log(1 + ...) 做平滑处理。负样本越相似，这一项越大。
         neg_term = torch.log(1 + (exp_sim * neg_weight).sum(dim=1))
 
         # 对 batch 中所有样本取平均，得到最终认知多标签对比损失,mean(): 对 batch 里所有样本取平均，得到一个标量 loss
@@ -401,6 +405,11 @@ class ECMC(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         audio, video, text, emo_category, cognition_category = batch['audio'], batch['video'], batch['text'], batch['emo_category'], batch['cognition_category']
         loss, combined_feature_emo, combined_feature_cong = self.forward(audio, video, text, emo_category, cognition_category)
+        if not torch.isfinite(loss):
+            raise FloatingPointError(
+                f"Non-finite training loss at batch {batch_idx}; "
+                f"emotion labels={emo_category.detach().cpu().tolist()}"
+            )
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True, batch_size=len(audio), sync_dist=True)
         
         self.training_step_outputs.append({
@@ -418,5 +427,5 @@ class ECMC(pl.LightningModule):
         return loss
     
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.parameters()), lr=0.000013, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-6)
+        optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.parameters()), lr=self.learning_rate, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-6)
         return optimizer

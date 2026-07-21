@@ -28,24 +28,24 @@ Neutral / Sadness / Anger / Happiness / Calmness
 
 每个 subject 包含：
 
-| 文件 | shape 示例 | 含义 |
-| ---- | ---------: | ---- |
-| `audio.npy` | `(400, 501, 256)` | 每个样本 501 个音频时间片，每个时间片 256 维 |
-| `video.npy` | `(400, 25, 512)` | 每个样本 25 个视频时间片，每个时间片 512 维 |
-| `eeg.npy` | `(400, 500, 30)` | 每个样本 500 个 EEG 时间点，每个时间点 30 维 |
-| `labels.npy` | `(400,)` | 五分类情绪标签 |
-| `split.npy` | `(400,)` | 训练 / 测试划分 |
+| 文件           |          shape 示例 | 含义                                         |
+| -------------- | ------------------: | -------------------------------------------- |
+| `audio.npy`  | `(400, 501, 256)` | 每个样本 501 个音频时间片，每个时间片 256 维 |
+| `video.npy`  |  `(400, 25, 512)` | 每个样本 25 个视频时间片，每个时间片 512 维  |
+| `eeg.npy`    |  `(400, 500, 30)` | 每个样本 500 个 EEG 时间点，每个时间点 30 维 |
+| `labels.npy` |          `(400,)` | 五分类情绪标签                               |
+| `split.npy`  |          `(400,)` | 训练 / 测试划分                              |
 
 数据规模：
 
-| 项目 | 数值 |
-| ---- | ---: |
-| subjects | 42 |
-| 每个 subject 样本数 | 400 |
-| 总样本数 | 16800 |
-| 训练集 | 11760 |
-| 测试集 | 5040 |
-| 测试集每类样本数 | 1008 |
+| 项目                |  数值 |
+| ------------------- | ----: |
+| subjects            |    42 |
+| 每个 subject 样本数 |   400 |
+| 总样本数            | 16800 |
+| 训练集              | 11760 |
+| 测试集              |  5040 |
+| 测试集每类样本数    |  1008 |
 
 由于测试集类别均衡，`Accuracy` 和 `Macro-F1` 都有参考价值；后续主要用 `Macro-F1` 比较模型。
 
@@ -92,10 +92,10 @@ learnable query tokens
 
 做了两类对比学习尝试：
 
-| 方法 | 含义 | 当前结果 |
-| ---- | ---- | -------- |
-| `AVCL` | 同一样本 audio/video 表示靠近，不同样本远离 | 有效 |
-| `label-SCL` | 同类别样本靠近，不同类别样本远离 | 当前无收益 |
+| 方法          | 含义                                        | 当前结果   |
+| ------------- | ------------------------------------------- | ---------- |
+| `AVCL`      | 同一样本 audio/video 表示靠近，不同样本远离 | 有效       |
+| `label-SCL` | 同类别样本靠近，不同类别样本远离            | 当前无收益 |
 
 ### 3.5 EEG 接入实验
 
@@ -111,20 +111,20 @@ QueryToken AVE
 
 ## 4. 关键结果总表
 
-| 模型 | 模态 | 说明 | Accuracy | Macro-F1 |
-| ---- | ---- | ---- | -------: | -------: |
-| MLP AV | A+V | mean pooling + MLP | 0.5726 | 0.5734 |
-| Temporal Audio | A | audio 时序建模 | 0.5752 | 0.5777 |
-| Temporal Video | V | video 时序建模 | 0.5905 | 0.5864 |
-| Temporal AV | A+V | audio/video 时序融合 | 0.7355 | 0.7368 |
-| QueryToken AV, q=16 | A+V | query-token + CE | 0.7308 | 0.7295 |
-| QueryToken AV, q=32 | A+V | query-token + CE | 0.7361 | 0.7356 |
-| QueryToken AV + AVCL, q=16 | A+V | query-token + audio-video 对齐 | 0.7486 | 0.7470 |
-| QueryToken AV + AVCL, q=32 | A+V | 更大 query 数量 + AVCL | 0.7405 | 0.7417 |
-| QueryToken AV + label-SCL, q=16 | A+V | query-token + 标签对比学习 | 0.7234 | 0.7234 |
-| Temporal EEG | E | EEG 单模态时序建模 | 0.4038 | 0.4047 |
-| Temporal AVE | A+V+E | audio/video/eeg 时序融合 | **0.7524** | **0.7533** |
-| QueryToken AVE, q=16 | A+V+E | 三模态 query-token + CE | 0.7474 | 0.7463 |
+| 模型                            | 模态  | 说明                           |         Accuracy |         Macro-F1 |
+| ------------------------------- | ----- | ------------------------------ | ---------------: | ---------------: |
+| MLP AV                          | A+V   | mean pooling + MLP             |           0.5726 |           0.5734 |
+| Temporal Audio                  | A     | audio 时序建模                 |           0.5752 |           0.5777 |
+| Temporal Video                  | V     | video 时序建模                 |           0.5905 |           0.5864 |
+| Temporal AV                     | A+V   | audio/video 时序融合           |           0.7355 |           0.7368 |
+| QueryToken AV, q=16             | A+V   | query-token + CE               |           0.7308 |           0.7295 |
+| QueryToken AV, q=32             | A+V   | query-token + CE               |           0.7361 |           0.7356 |
+| QueryToken AV + AVCL, q=16      | A+V   | query-token + audio-video 对齐 |           0.7486 |           0.7470 |
+| QueryToken AV + AVCL, q=32      | A+V   | 更大 query 数量 + AVCL         |           0.7405 |           0.7417 |
+| QueryToken AV + label-SCL, q=16 | A+V   | query-token + 标签对比学习     |           0.7234 |           0.7234 |
+| Temporal EEG                    | E     | EEG 单模态时序建模             |           0.4038 |           0.4047 |
+| Temporal AVE                    | A+V+E | audio/video/eeg 时序融合       | **0.7524** | **0.7533** |
+| QueryToken AVE, q=16            | A+V+E | 三模态 query-token + CE        |           0.7474 |           0.7463 |
 
 当前最佳结果：
 
@@ -259,13 +259,13 @@ cognition label
 
 已经迁移和验证的 ECMC 相关思想包括：
 
-| ECMC 思想 | 当前 EAV 实验对应实现 | 结果 |
-| --------- | --------------------- | ---- |
-| 多模态表示学习 | audio/video/eeg 融合 | 有效 |
-| 时序特征建模 | Temporal attention pooling | 有效 |
-| query-token 表示抽取 | QueryToken AV / AVE | 部分有效 |
-| 跨模态对齐 | AVCL | 有效 |
-| 标签监督对比学习 | label-SCL | 当前无收益 |
+| ECMC 思想            | 当前 EAV 实验对应实现      | 结果       |
+| -------------------- | -------------------------- | ---------- |
+| 多模态表示学习       | audio/video/eeg 融合       | 有效       |
+| 时序特征建模         | Temporal attention pooling | 有效       |
+| query-token 表示抽取 | QueryToken AV / AVE        | 部分有效   |
+| 跨模态对齐           | AVCL                       | 有效       |
+| 标签监督对比学习     | label-SCL                  | 当前无收益 |
 
 不能声称的内容：
 
@@ -305,7 +305,7 @@ Macro-F1 = 0.7533
 4. 如果后续拿到原始音频/视频，再考虑 ASR text 分支。
 5. 如果要完整复现 ECMC，需要继续争取 MMDA 或类似心理健康访谈数据。
 
-## 9. 给师兄汇报的话术
+## 9. 汇报
 
 可以这样说：
 

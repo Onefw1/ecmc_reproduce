@@ -116,7 +116,7 @@ class ECMCLLaMA(ECMC):
         # BOS 只有 1 个 token，复用多模态 mask 的第一列形状构造 BOS mask。(B, 1)
         attn_bos = attn_audio[:, :1]
         # 拼接完整 attention mask，长度必须和 input_embeds 的序列长度一致。
-        #告诉LLaMA哪些 token 是有效输入，需要参与注意力计算；哪些 token 是 padding，需要忽略。
+        #告诉LLaMA哪些 token 是有效输入，需要参与注意力计算；哪些 token是padding，需要忽略。
         #attention_mask: (B, 1 + 192 + prompt_len + caption_len)
         attention_mask = torch.cat([attn_bos, attn_audio, attn_prompt, attn_text], dim=1)
 
