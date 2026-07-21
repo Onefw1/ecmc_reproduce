@@ -29,16 +29,23 @@ num_workers = int(os.getenv("ECMC_NUM_WORKERS", "0"))
 max_steps = int(os.getenv("ECMC_MAX_STEPS", "20"))
 max_epochs = int(os.getenv("ECMC_MAX_EPOCHS", "1"))
 learning_rate = float(os.getenv("ECMC_LEARNING_RATE", "1e-4"))
+decoder_dtype = os.getenv("ECMC_DECODER_DTYPE", "float32")
+precision = os.getenv("ECMC_PRECISION", "32-true")
 checkpoint_dir = os.getenv("ECMC_CHECKPOINT_DIR", "./checkpoints/stage2_emotion")
 checkpoint_every_n_steps = int(os.getenv("ECMC_CHECKPOINT_EVERY_N_STEPS", "3909"))
 save_last = os.getenv("ECMC_SAVE_LAST", "0") == "1"
 
-model = ECMCLLaMA(llama_ckpt=llama_ckpt, learning_rate=learning_rate)
+model = ECMCLLaMA(
+    llama_ckpt=llama_ckpt,
+    learning_rate=learning_rate,
+    decoder_dtype=decoder_dtype,
+)
 checkpoint = torch.load(stage1_ckpt, map_location="cpu", weights_only=False)
 missing_keys, unexpected_keys = model.load_state_dict(checkpoint["state_dict"], strict=False)
 print(f"Initialized Stage 1 encoder from: {stage1_ckpt}")
 print(f"Missing keys: {len(missing_keys)}; unexpected keys: {len(unexpected_keys)}")
 print(f"Stage 2 trainable parameters: {model.trainable_parameter_count:,}")
+print(f"Decoder dtype: {decoder_dtype}; trainer precision: {precision}")
 
 dataset_kwargs = {
     "root_dir": data_root,
@@ -72,7 +79,7 @@ checkpoint_callback = ModelCheckpoint(
 trainer = Trainer(
     accelerator="gpu",
     devices=1,
-    precision="16-mixed",
+    precision=precision,
     max_epochs=max_epochs,
     max_steps=max_steps,
     gradient_clip_val=1.0,
