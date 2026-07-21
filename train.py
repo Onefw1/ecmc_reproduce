@@ -73,7 +73,7 @@ train_sampler = WeightedRandomSampler(
     replacement=True,
 )
 
-train_loader=DataLoader(train_set, sampler=train_sampler, shuffle=False, **loader_kwargs)
+train_loader=DataLoader(train_set, sampler=train_sampler, shuffle=False, drop_last=True, **loader_kwargs)
 val_loader=DataLoader(val_set, shuffle=False, **loader_kwargs)
 
 #put your own checkpoint dir here
