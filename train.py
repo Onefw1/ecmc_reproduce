@@ -36,6 +36,7 @@ save_last = os.getenv("ECMC_SAVE_LAST", "1") == "1"
 checkpoint_dir = os.getenv("ECMC_CHECKPOINT_DIR", "./checkpoints")
 precision = os.getenv("ECMC_PRECISION", "32-true")
 gradient_clip_val = float(os.getenv("ECMC_GRADIENT_CLIP_VAL", "1.0"))
+resume_ckpt = os.getenv("ECMC_RESUME_CKPT", "")
 print(f"Resource-safe mode: {not train_qformers}; trainable parameters: "
       f"{sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
 print(f"Trainer precision: {precision}; learning rate: {learning_rate}; gradient clip: {gradient_clip_val}")
@@ -101,4 +102,4 @@ trainer = pl.Trainer(
     #strategy="ddp_find_unused_parameters_true"
     )
 
-trainer.fit(model, train_loader, val_loader)
+trainer.fit(model, train_loader, val_loader, ckpt_path=resume_ckpt or None)
