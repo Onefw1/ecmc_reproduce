@@ -36,6 +36,7 @@ class ECMC(pl.LightningModule):
         hidden_size=768,
         cognition_loss_weight=1.0,
         train_qformers=True,
+        train_query_tokens=False,
         learning_rate=1.3e-5):
         super(ECMC,self).__init__()
         self.training_step_outputs  = []
@@ -56,6 +57,7 @@ class ECMC(pl.LightningModule):
         self.video_adapter = nn.Linear(video_input_dim, hidden_size)
         self.cognition_loss_weight = cognition_loss_weight
         self.train_qformers = train_qformers
+        self.train_query_tokens = train_query_tokens
         self.learning_rate = learning_rate
 
         #Qformer-audio-emo
@@ -125,15 +127,24 @@ class ECMC(pl.LightningModule):
             )
             for qformer in qformers:
                 qformer.requires_grad_(False)
-            for query_tokens in (
-                self.audio_query_tokens,
-                self.video_query_tokens,
-                self.text_query_tokens,
-                self.audio_query_tokens_cong,
-                self.video_query_tokens_cong,
-                self.text_query_tokens_cong,
-            ):
-                query_tokens.requires_grad_(False)
+            if not self.train_query_tokens:
+                for query_tokens in (
+                    self.audio_query_tokens,
+                    self.video_query_tokens,
+                    self.text_query_tokens,
+                    self.audio_query_tokens_cong,
+                    self.video_query_tokens_cong,
+                    self.text_query_tokens_cong,
+                ):
+                    query_tokens.requires_grad_(False)
+            elif self.cognition_loss_weight == 0:
+                # Cognition tokens have no gradient when cognition loss is disabled.
+                for query_tokens in (
+                    self.audio_query_tokens_cong,
+                    self.video_query_tokens_cong,
+                    self.text_query_tokens_cong,
+                ):
+                    query_tokens.requires_grad_(False)
             self.audio_llama_project.requires_grad_(False)
         
 

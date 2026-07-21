@@ -20,10 +20,12 @@ label_root = "my_text/egocom_ecmc_labeled"
 # EgoCom cognition positives are too sparse for stable contrastive supervision.
 # Adapter-only is the default resource-safe mode for Colab validation.
 train_qformers = os.getenv("ECMC_TRAIN_QFORMERS", "0") == "1"
+train_query_tokens = os.getenv("ECMC_TRAIN_QUERY_TOKENS", "0") == "1"
 learning_rate = float(os.getenv("ECMC_LEARNING_RATE", "1e-6"))
 model=ECMC(
     cognition_loss_weight=0.0,
     train_qformers=train_qformers,
+    train_query_tokens=train_query_tokens,
     learning_rate=learning_rate,
 )
 
@@ -37,9 +39,18 @@ checkpoint_dir = os.getenv("ECMC_CHECKPOINT_DIR", "./checkpoints")
 precision = os.getenv("ECMC_PRECISION", "32-true")
 gradient_clip_val = float(os.getenv("ECMC_GRADIENT_CLIP_VAL", "1.0"))
 resume_ckpt = os.getenv("ECMC_RESUME_CKPT", "")
+init_weights_ckpt = os.getenv("ECMC_INIT_WEIGHTS_CKPT", "")
+if resume_ckpt and init_weights_ckpt:
+    raise ValueError("Use only one of ECMC_RESUME_CKPT or ECMC_INIT_WEIGHTS_CKPT.")
+if init_weights_ckpt:
+    checkpoint = torch.load(init_weights_ckpt, map_location="cpu", weights_only=False)
+    missing_keys, unexpected_keys = model.load_state_dict(checkpoint["state_dict"], strict=False)
+    print(f"Initialized model weights from: {init_weights_ckpt}")
+    print(f"Missing keys: {len(missing_keys)}; unexpected keys: {len(unexpected_keys)}")
 print(f"Resource-safe mode: {not train_qformers}; trainable parameters: "
       f"{sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
-print(f"Trainer precision: {precision}; learning rate: {learning_rate}; gradient clip: {gradient_clip_val}")
+print(f"Train query tokens: {train_query_tokens}; trainer precision: {precision}; "
+      f"learning rate: {learning_rate}; gradient clip: {gradient_clip_val}")
 #create the train and val set
 train_set = MMDADataset(
         root_dir=data_root,
