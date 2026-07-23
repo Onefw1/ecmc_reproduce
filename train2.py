@@ -34,6 +34,8 @@ precision = os.getenv("ECMC_PRECISION", "32-true")
 checkpoint_dir = os.getenv("ECMC_CHECKPOINT_DIR", "./checkpoints/stage2_emotion")
 checkpoint_every_n_steps = int(os.getenv("ECMC_CHECKPOINT_EVERY_N_STEPS", "3909"))
 save_last = os.getenv("ECMC_SAVE_LAST", "0") == "1"
+limit_val_batches_raw = os.getenv("ECMC_LIMIT_VAL_BATCHES", "1")
+limit_val_batches = int(limit_val_batches_raw) if limit_val_batches_raw.isdigit() else float(limit_val_batches_raw)
 
 model = ECMCLLaMA(
     llama_ckpt=llama_ckpt,
@@ -46,6 +48,7 @@ print(f"Initialized Stage 1 encoder from: {stage1_ckpt}")
 print(f"Missing keys: {len(missing_keys)}; unexpected keys: {len(unexpected_keys)}")
 print(f"Stage 2 trainable parameters: {model.trainable_parameter_count:,}")
 print(f"Decoder dtype: {decoder_dtype}; trainer precision: {precision}")
+print(f"Validation batches per run: {limit_val_batches}")
 
 dataset_kwargs = {
     "root_dir": data_root,
@@ -82,6 +85,8 @@ trainer = Trainer(
     precision=precision,
     max_epochs=max_epochs,
     max_steps=max_steps,
+    num_sanity_val_steps=0,
+    limit_val_batches=limit_val_batches,
     gradient_clip_val=1.0,
     callbacks=[checkpoint_callback],
     logger=TensorBoardLogger(save_dir="./logger", name="MMDA_stage2_emotion"),
